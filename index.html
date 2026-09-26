@@ -145,7 +145,7 @@
     <div class="wrap">
       <div class="section-head">
         <div><h2>AI Workspace</h2></div>
-        <p>Everything below works in the browser. Connect a server-side AI API later for real model-generated answers.</p>
+        <p>Everything below uses a secure backend. Your AI API key stays on the server.</p>
       </div>
 
       <div class="workspace">
@@ -166,7 +166,7 @@
               </div>
               <div class="tool-actions">
                 <button class="btn secondary" onclick="clearWriter()">Clear</button>
-                <button class="btn" onclick="generateWriter()">Generate Draft</button>
+                <button class="btn" onclick="generateWriter()">Generate with AI</button>
               </div>
             </div>
             <div>
@@ -186,7 +186,7 @@
                 <select id="promptType" class="grow"><option>Image Generation</option><option>Writing</option><option>Research</option><option>Video</option></select>
                 <select id="promptStyle" class="grow"><option>Detailed</option><option>Cinematic</option><option>Minimal</option><option>Professional</option></select>
               </div>
-              <div class="tool-actions"><button class="btn" onclick="generatePrompt()">Build Prompt</button></div>
+              <div class="tool-actions"><button class="btn" onclick="generatePrompt()">Generate with AI</button></div>
             </div>
             <div>
               <label>Generated prompt</label>
@@ -280,40 +280,58 @@ function copyText(id){
   navigator.clipboard?.writeText(el.textContent || el.value || '').then(()=>alert('Copied ✅')).catch(()=>alert('Copy failed'));
 }
 function clearWriter(){document.getElementById('writerInput').value='';document.getElementById('writerOutput').textContent='Your draft will appear here.'}
-function generateWriter(){
-  const topic=document.getElementById('writerInput').value.trim() || 'your topic';
+async function generateWriter(){
+  const topic=document.getElementById('writerInput').value.trim();
   const tone=document.getElementById('writerTone').value;
   const type=document.getElementById('writerType').value;
-  let text='';
-  if(type==='Caption'){
-    text = `${topic}\n\nCreate a ${tone.toLowerCase()} caption that feels natural, clear and engaging. Keep it concise, add one memorable line and 3–5 relevant hashtags.\n\n#content #creator #india`;
-  } else if(type==='Email'){
-    text = `Subject: ${topic}\n\nHi there,\n\nI’m reaching out regarding ${topic}. I wanted to share the key details clearly and keep the next step simple.\n\nPlease let me know what works best for you.\n\nBest,\nYour Name`;
-  } else if(type==='Product Description'){
-    text = `${topic}\n\nA clean, ${tone.toLowerCase()} product description should explain what it is, who it helps, the main benefit, and a simple call to action.\n\nKey benefits:\n• Clear value proposition\n• Easy-to-understand wording\n• Strong action-focused ending`;
-  } else if(type==='Short Blog'){
-    text = `# ${topic}\n\nIntroduction\nThis short article introduces ${topic} in a ${tone.toLowerCase()} voice.\n\n## Why it matters\nExplain the main benefit, common use cases and what a beginner should know.\n\n## Quick takeaway\nFinish with 3 practical points readers can act on today.`;
-  } else {
-    text = `${topic}\n\nHook: Stop scrolling — here’s why ${topic} matters.\n\nValue: Explain the biggest benefit in simple language, add one proof point, then show the outcome.\n\nCTA: Try it today and see the difference.`;
+  const out=document.getElementById('writerOutput');
+  if(!topic){out.textContent='Please enter a topic first.';return;}
+  out.textContent='Generating…';
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        messages:[
+          {role:'system',content:'You are ToolBhai AI Writer. Write useful, natural, concise content. Follow the requested format and tone. Do not invent specific facts unless the user provides them.'},
+          {role:'user',content:`Create a ${type.toLowerCase()} about: ${topic}\nTone: ${tone}`}
+        ]
+      })
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error || 'Request failed');
+    out.textContent=data.text || 'No text returned.';
+  }catch(err){
+    out.textContent='Error: '+err.message;
   }
-  document.getElementById('writerOutput').textContent=text;
 }
-function generatePrompt(){
-  const idea=document.getElementById('promptInput').value.trim() || 'a useful creative project';
+
+async function generatePrompt(){
+  const idea=document.getElementById('promptInput').value.trim();
   const type=document.getElementById('promptType').value;
   const style=document.getElementById('promptStyle').value;
-  let prompt='';
-  if(type==='Image Generation'){
-    prompt = `Create a ${style.toLowerCase()} image of ${idea}. Composition: strong subject hierarchy, clean framing, realistic details, natural lighting, refined color balance. Mood: modern and visually engaging. Quality: high detail, sharp focus, professional finish. Avoid distorted faces, extra fingers, warped text, low-resolution artifacts.`;
-  } else if(type==='Writing'){
-    prompt = `Write about ${idea} in a ${style.toLowerCase()} style. Start with a clear hook, use simple language, organize the answer with short sections, include practical examples, and end with a concise takeaway. Do not invent facts.`;
-  } else if(type==='Research'){
-    prompt = `Research ${idea}. Give a ${style.toLowerCase()} summary with key facts, important dates or figures where relevant, source links, caveats, and clearly separated facts vs. interpretation. Prioritize recent, reliable sources.`;
-  } else {
-    prompt = `Create a ${style.toLowerCase()} video concept about ${idea}. Include opening hook, scene-by-scene visuals, camera movement, on-screen text, narration, pacing, sound design and a final call to action.`;
+  const out=document.getElementById('promptOutput');
+  if(!idea){out.textContent='Please enter an idea first.';return;}
+  out.textContent='Building prompt…';
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        messages:[
+          {role:'system',content:'You are ToolBhai Prompt Generator. Turn rough ideas into precise, copy-ready prompts. Include useful context, style, structure, constraints, and quality notes when relevant.'},
+          {role:'user',content:`Build a ${type.toLowerCase()} prompt for: ${idea}\nPreferred style: ${style}`}
+        ]
+      })
+    });
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error || 'Request failed');
+    out.textContent=data.text || 'No prompt returned.';
+  }catch(err){
+    out.textContent='Error: '+err.message;
   }
-  document.getElementById('promptOutput').textContent=prompt;
 }
+
 function fitCanvas(w,h){
   const maxW=900,maxH=620,scale=Math.min(maxW/w,maxH/h,1);
   canvas.width=Math.max(1,Math.round(w*scale));
